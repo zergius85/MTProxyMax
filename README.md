@@ -500,20 +500,20 @@ mtproxymax telegram remove              # Remove bot completely
 
 ## 📋 Changelog
 
-### v1.0.0 — Engine v3.1.2
+### v1.0.0 — Engine v3.1.6
 
-**Engine Upgrade (v3.0.15 → v3.1.2):**
+**Engine Upgrade (v3.1.2 → v3.1.6):**
 
-- **Parallel STUN Queries** — STUN subsystem now queries multiple servers in parallel for faster NAT detection
-- **Async ME Pool Init** — Middle-end pools created asynchronously and in parallel, faster startup and recovery
-- **Dead Writer Cleanup** — ME writers in dead state removed immediately, no more lingering connections or deadlocks
-- **Pool Validation** — Strict ME pool validation before accepting client connections, prevents failed handshakes
-- **Pool Observer** — New flap-detection in statistics monitors pool stability
-- **TLS-F Optimization** — TLS fingerprint fetching optimized
-- **ME Probe Parallelized** — Health checks run concurrently instead of serially
-- **Built-in Defaults** — Sensible defaults baked in, `tls_emulation` enabled by default, minimal config needed
-- **Detected IP in Links** — Log output now shows correct detected IP in proxy links
-- **PROXY Protocol Masking** — New `mask_proxy_protocol` option for PROXY protocol support
+- **Writer Lifecycle Model** — Pool writers now follow Warm → Active → Draining lifecycle with generation-aware safe promotion
+- **Shadow Writers** — Single-endpoint DCs get shadow writers for resilience, with periodic rotation to prevent silent decay
+- **Outage Recovery** — Automatic aggressive reconnect loop when all writers are lost, with backoff and optional quarantine bypass
+- **Adaptive Floor** — Dynamic minimum writer target reduces idle churn while preserving fast recovery under load (enabled by default)
+- **DNS Overrides** — Custom DNS resolution at engine level, hot-reloadable
+- **Upstream Retry + Health** — Upstreams retry 3x with backoff, auto-marked unhealthy after consecutive failures
+- **ME/DC Method Detection** — Engine detects optimal connection method per datacenter
+- **Backpressure Tuning** — Adaptive base/high watermark timeouts for ME routing under load
+- **Metrics Security** — Prometheus endpoint binds to localhost only by default
+- **Per-User Ad-Tag** — Individual ad-tags per user with global fallback
 
 ### v1.0.0 — Per-User Limits + Telegram Bot
 
