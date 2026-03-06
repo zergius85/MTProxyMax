@@ -500,20 +500,18 @@ mtproxymax telegram remove              # Remove bot completely
 
 ## 📋 Changelog
 
-### v1.0.0 — Engine v3.1.6
+### v1.0.0 — Engine v3.3.3 LTS
 
-**Engine Upgrade (v3.1.2 → v3.1.6):**
+**Engine Upgrade (v3.1.6 → v3.3.3 LTS):**
 
-- **Writer Lifecycle Model** — Pool writers now follow Warm → Active → Draining lifecycle with generation-aware safe promotion
-- **Shadow Writers** — Single-endpoint DCs get shadow writers for resilience, with periodic rotation to prevent silent decay
-- **Outage Recovery** — Automatic aggressive reconnect loop when all writers are lost, with backoff and optional quarantine bypass
-- **Adaptive Floor** — Dynamic minimum writer target reduces idle churn while preserving fast recovery under load (enabled by default)
-- **DNS Overrides** — Custom DNS resolution at engine level, hot-reloadable
-- **Upstream Retry + Health** — Upstreams retry 3x with backoff, auto-marked unhealthy after consecutive failures
-- **ME/DC Method Detection** — Engine detects optimal connection method per datacenter
-- **Backpressure Tuning** — Adaptive base/high watermark timeouts for ME routing under load
-- **Metrics Security** — Prometheus endpoint binds to localhost only by default
-- **Per-User Ad-Tag** — Individual ad-tags per user with global fallback
+- **ME NoWait Routing** — Connections no longer block waiting for writers, reducing latency spikes under churn
+- **Async Recovery Failfast** — New send path with async recovery instead of inline blocking, fewer stalls under load
+- **Atomic Secret Snapshots** — Lock-free secret reads on every connection for higher throughput at scale
+- **HybridAsyncPersistent** — New ME route mode keeps routing even when writers are temporarily unavailable
+- **Upstream Connection Budget** — Limits concurrent upstream connection attempts, prevents connection storms
+- **IP Limit Rework** — New IP tracking system with unique IP always in metrics
+- **ME Pool Init Fixes** — More reliable pool initialization with retry logic
+- **ME-to-DC Fallback** — Graceful fallback when preferred DC method is unavailable
 
 ### v1.0.0 — Per-User Limits + Telegram Bot
 
