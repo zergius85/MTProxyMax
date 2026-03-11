@@ -1978,7 +1978,7 @@ get_proxy_link_https() {
 
 # Set per-user limits for a secret
 secret_set_limits() {
-    local label="$1" max_conns="${2:-}" max_ips="${3:-}" quota="${4:-}" expires="${5:-}"
+    local label="$1" max_conns="${2:-}" max_ips="${3:-}" quota="${4:-}" expires="${5:-}" no_restart="${6:-false}"
 
     local idx=-1
     local i
@@ -2026,7 +2026,7 @@ secret_set_limits() {
 
     save_secrets
 
-    if is_proxy_running; then
+    if [ "$no_restart" != "true" ] && is_proxy_running; then
         restart_proxy_container
     fi
 
@@ -4291,8 +4291,8 @@ show_cli_help() {
     echo -e "    ${GREEN}secret enable${NC} <label>   Enable a secret"
     echo -e "    ${GREEN}secret disable${NC} <label>  Disable a secret"
     echo -e "    ${GREEN}secret limits${NC} [label]   Show user limits"
-    echo -e "    ${GREEN}secret setlimit${NC} <label> conns|ips|quota|expires <value>"
-    echo -e "    ${GREEN}secret setlimits${NC} <label> <conns> <ips> <quota> [expires]"
+    echo -e "    ${GREEN}secret setlimit${NC} <label> conns|ips|quota|expires <value> [--no-restart]"
+    echo -e "    ${GREEN}secret setlimits${NC} <label> <conns> <ips> <quota> [expires] [--no-restart]"
     echo -e "    ${DIM}Tip: add/remove support --no-restart flag for scripting${NC}"
     echo ""
     echo -e "  ${BOLD}Upstream Routing:${NC}"
@@ -4469,30 +4469,44 @@ cli_main() {
                 limits)  secret_show_limits "$1" ;;
                 setlimit)
                     check_root
+                    local _no_restart="false"
+                    local _args=()
+                    for _a in "$@"; do
+                        if [ "$_a" = "--no-restart" ]; then _no_restart="true"
+                        else _args+=("$_a"); fi
+                    done
+                    set -- "${_args[@]}"
                     local label="$1"; shift 2>/dev/null || true
                     local field="$1"; shift 2>/dev/null || true
                     local value="$1"
                     if [ -z "$label" ] || [ -z "$field" ] || [ -z "$value" ]; then
-                        log_error "Usage: mtproxymax secret setlimit <label> conns|ips|quota|expires <value>"
+                        log_error "Usage: mtproxymax secret setlimit <label> conns|ips|quota|expires <value> [--no-restart]"
                         return 1
                     fi
                     case "$field" in
-                        conns)   secret_set_limits "$label" "$value" "" "" "" ;;
-                        ips)     secret_set_limits "$label" "" "$value" "" "" ;;
-                        quota)   secret_set_limits "$label" "" "" "$value" "" ;;
-                        expires) secret_set_limits "$label" "" "" "" "$value" ;;
-                        *) log_error "Usage: mtproxymax secret setlimit <label> conns|ips|quota|expires <value>"; return 1 ;;
+                        conns)   secret_set_limits "$label" "$value" "" "" "" "$_no_restart" ;;
+                        ips)     secret_set_limits "$label" "" "$value" "" "" "$_no_restart" ;;
+                        quota)   secret_set_limits "$label" "" "" "$value" "" "$_no_restart" ;;
+                        expires) secret_set_limits "$label" "" "" "" "$value" "$_no_restart" ;;
+                        *) log_error "Usage: mtproxymax secret setlimit <label> conns|ips|quota|expires <value> [--no-restart]"; return 1 ;;
                     esac
                     ;;
                 setlimits)
                     check_root
+                    local _no_restart="false"
+                    local _args=()
+                    for _a in "$@"; do
+                        if [ "$_a" = "--no-restart" ]; then _no_restart="true"
+                        else _args+=("$_a"); fi
+                    done
+                    set -- "${_args[@]}"
                     local label="$1"; shift 2>/dev/null || true
                     local sl_conns="${1:-0}"; shift 2>/dev/null || true
                     local sl_ips="${1:-0}"; shift 2>/dev/null || true
                     local sl_quota="${1:-0}"; shift 2>/dev/null || true
                     local sl_exp="${1:-}"
-                    [ -z "$label" ] && { log_error "Usage: mtproxymax secret setlimits <label> <conns> <ips> <quota> [expires]"; return 1; }
-                    secret_set_limits "$label" "$sl_conns" "$sl_ips" "$sl_quota" "$sl_exp"
+                    [ -z "$label" ] && { log_error "Usage: mtproxymax secret setlimits <label> <conns> <ips> <quota> [expires] [--no-restart]"; return 1; }
+                    secret_set_limits "$label" "$sl_conns" "$sl_ips" "$sl_quota" "$sl_exp" "$_no_restart"
                     ;;
                 *)       log_error "Unknown: secret ${subcmd}"; show_cli_help; return 1 ;;
             esac
