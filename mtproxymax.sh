@@ -103,6 +103,7 @@ PROXY_CONCURRENCY=8192
 PROXY_CPUS=""
 PROXY_MEMORY=""
 CUSTOM_IP=""
+FAKE_CERT_LEN=2048
 AD_TAG=""
 BLOCKLIST_COUNTRIES=""
 MASKING_ENABLED="true"
@@ -551,6 +552,7 @@ PROXY_CONCURRENCY='${PROXY_CONCURRENCY}'
 PROXY_CPUS='${PROXY_CPUS}'
 PROXY_MEMORY='${PROXY_MEMORY}'
 CUSTOM_IP='${CUSTOM_IP}'
+FAKE_CERT_LEN='${FAKE_CERT_LEN}'
 
 # Ad-Tag (from @MTProxyBot)
 AD_TAG='${AD_TAG}'
@@ -602,7 +604,7 @@ load_settings() {
         # Whitelist of allowed keys
         case "$key" in
             PROXY_PORT|PROXY_METRICS_PORT|PROXY_DOMAIN|PROXY_CONCURRENCY|\
-            PROXY_CPUS|PROXY_MEMORY|CUSTOM_IP|AD_TAG|BLOCKLIST_COUNTRIES|\
+            PROXY_CPUS|PROXY_MEMORY|CUSTOM_IP|FAKE_CERT_LEN|AD_TAG|BLOCKLIST_COUNTRIES|\
             MASKING_ENABLED|MASKING_HOST|MASKING_PORT|\
             TELEGRAM_ENABLED|TELEGRAM_BOT_TOKEN|TELEGRAM_CHAT_ID|\
             TELEGRAM_INTERVAL|TELEGRAM_ALERTS_ENABLED|TELEGRAM_SERVER_LABEL|\
@@ -616,6 +618,7 @@ load_settings() {
     [[ "$PROXY_PORT" =~ ^[0-9]+$ ]] && [ "$PROXY_PORT" -ge 1 ] && [ "$PROXY_PORT" -le 65535 ] || PROXY_PORT=443
     [[ "$PROXY_METRICS_PORT" =~ ^[0-9]+$ ]] && [ "$PROXY_METRICS_PORT" -ge 1 ] && [ "$PROXY_METRICS_PORT" -le 65535 ] || PROXY_METRICS_PORT=9090
     [[ "$MASKING_PORT" =~ ^[0-9]+$ ]] && [ "$MASKING_PORT" -ge 1 ] && [ "$MASKING_PORT" -le 65535 ] || MASKING_PORT=443
+    [[ "$FAKE_CERT_LEN" =~ ^[0-9]+$ ]] && [ "$FAKE_CERT_LEN" -ge 512 ] || FAKE_CERT_LEN=2048
     [[ "$PROXY_CONCURRENCY" =~ ^[0-9]+$ ]] || PROXY_CONCURRENCY=8192
     [[ "$TELEGRAM_INTERVAL" =~ ^[0-9]+$ ]] || TELEGRAM_INTERVAL=6
     [[ "$TELEGRAM_CHAT_ID" =~ ^-?[0-9]+$ ]] || TELEGRAM_CHAT_ID=""
@@ -1050,7 +1053,7 @@ tls_domain = "${domain}"
 mask = ${mask_enabled}
 mask_port = ${mask_port}
 $([ "$mask_enabled" = "true" ] && [ -n "$mask_host" ] && echo "mask_host = \"${mask_host}\"")
-fake_cert_len = 2048
+fake_cert_len = ${FAKE_CERT_LEN:-2048}
 # Note: geo-blocking is enforced at the host firewall level (iptables/nftables),
 # not via telemt config. See: mtproxymax info -> Geo-Blocking
 
@@ -3131,7 +3134,7 @@ telegram_notify_proxy_started() {
     server_ip=$(get_public_ip)
     [ -z "$server_ip" ] && return 1
 
-    # Build message with all enabled secrets (split details — no full proxy URLs)
+    # Build message with all enabled secrets and clickable connect links
     local msg="📱 *MTProxy Started*\n\n"
     local i _first_secret=""
     for i in "${!SECRETS_LABELS[@]}"; do
@@ -3140,13 +3143,12 @@ telegram_notify_proxy_started() {
         full_secret=$(build_faketls_secret "${SECRETS_KEYS[$i]}")
         [ -z "$_first_secret" ] && _first_secret="$full_secret"
         msg+="🏷 *${SECRETS_LABELS[$i]}*\n"
-        msg+="📡 Server: \`${server_ip}\`\n"
-        msg+="🔌 Port: \`${PROXY_PORT}\`\n"
-        msg+="🔑 Secret: \`${full_secret}\`\n\n"
+        msg+="🔗 [Connect](https://t.me/proxy?server=${server_ip}&port=${PROXY_PORT}&secret=${full_secret})\n"
+        msg+="📡 \`${server_ip}:${PROXY_PORT}\` | 🔑 \`${full_secret}\`\n\n"
     done
 
-    msg+="📊 Port: ${PROXY_PORT} | Domain: ${PROXY_DOMAIN}\n"
-    msg+="_Scan the QR code below to connect._"
+    msg+="📊 Domain: ${PROXY_DOMAIN}\n"
+    msg+="_Tap the link above or scan QR code to connect._"
 
     telegram_send_message "$msg"
 
@@ -3616,7 +3618,7 @@ _process_cmd() {
                 local dh=$(domain_to_hex "${PROXY_DOMAIN:-cloudflare.com}")
                 local fs="ee${secret}${dh}"
                 [ -z "$_first_fs" ] && _first_fs="$fs"
-                msg+="🏷 *$(_esc "$label")*\n📡 Server: \`${ip}\`\n🔌 Port: \`${PROXY_PORT}\`\n🔑 Secret: \`${fs}\`\n\n"
+                msg+="🏷 *$(_esc "$label")*\n🔗 [Connect](https://t.me/proxy?server=${ip}&port=${PROXY_PORT}&secret=${fs})\n📡 \`${ip}:${PROXY_PORT}\` | 🔑 \`${fs}\`\n\n"
             done < "$SECRETS_FILE"
             tg_send "$msg"
             # Send QR for first enabled secret
@@ -3633,7 +3635,7 @@ _process_cmd() {
                 local ns=$(grep "^${label}|" "$SECRETS_FILE" 2>/dev/null | head -1 | cut -d'|' -f2)
                 local dh=$(domain_to_hex "${PROXY_DOMAIN:-cloudflare.com}")
                 local fs="ee${ns}${dh}"
-                tg_send "✅ Secret *$(_esc "$label")* created!\n\n📡 Server: \`${ip}\`\n🔌 Port: \`${PROXY_PORT}\`\n🔑 Secret: \`${fs}\`"
+                tg_send "✅ Secret *$(_esc "$label")* created!\n\n🔗 [Connect](https://t.me/proxy?server=${ip}&port=${PROXY_PORT}&secret=${fs})\n📡 \`${ip}:${PROXY_PORT}\` | 🔑 \`${fs}\`"
                 send_proxy_qr "$ip" "$PROXY_PORT" "$fs"
             else
                 tg_send "❌ Failed to add secret '$(_esc "$label")' (may already exist)"
@@ -3672,7 +3674,7 @@ _process_cmd() {
                 local ns=$(grep "^${label}|" "$SECRETS_FILE" 2>/dev/null | head -1 | cut -d'|' -f2)
                 local dh=$(domain_to_hex "${PROXY_DOMAIN:-cloudflare.com}")
                 local fs="ee${ns}${dh}"
-                tg_send "🔄 Secret *$(_esc "$label")* rotated!\n\n📡 Server: \`${ip}\`\n🔌 Port: \`${PROXY_PORT}\`\n🔑 Secret: \`${fs}\`"
+                tg_send "🔄 Secret *$(_esc "$label")* rotated!\n\n🔗 [Connect](https://t.me/proxy?server=${ip}&port=${PROXY_PORT}&secret=${fs})\n📡 \`${ip}:${PROXY_PORT}\` | 🔑 \`${fs}\`"
                 send_proxy_qr "$ip" "$PROXY_PORT" "$fs"
             else
                 tg_send "❌ Secret '$(_esc "$label")' not found"
@@ -3962,15 +3964,15 @@ run_installer() {
     echo ""
     local _detected_ip
     _detected_ip=$(CUSTOM_IP="" get_public_ip)
-    echo -e "  ${BOLD}Server IP${NC} ${DIM}(used in proxy links)${NC}"
-    echo -en "  ${DIM}Detected: ${_detected_ip:-unknown} — Enter custom IP or press Enter [${_detected_ip:-auto}]:${NC} "
+    echo -e "  ${BOLD}Server IP or Domain${NC} ${DIM}(used in proxy links — IP or hostname both work)${NC}"
+    echo -en "  ${DIM}Detected: ${_detected_ip:-unknown} — Enter custom IP/domain or press Enter [${_detected_ip:-auto}]:${NC} "
     local ip_input
     read -r ip_input
     if [ -n "$ip_input" ]; then
-        if [[ "$ip_input" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$ip_input" =~ ^[0-9a-fA-F:]+$ ]]; then
+        if [[ "$ip_input" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$ip_input" =~ ^[0-9a-fA-F:]+$ ]] || [[ "$ip_input" =~ ^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$ ]]; then
             CUSTOM_IP="$ip_input"
         else
-            log_warn "Invalid IP address, using auto-detected"
+            log_warn "Invalid IP/domain, using auto-detected"
         fi
     fi
 
@@ -4335,7 +4337,7 @@ show_cli_help() {
     echo ""
     echo -e "  ${BOLD}Configuration:${NC}"
     echo -e "    ${GREEN}port${NC} [get|<number>]       Show or change proxy port"
-    echo -e "    ${GREEN}ip${NC} [get|auto|<address>]   Show, reset, or set custom IP for links"
+    echo -e "    ${GREEN}ip${NC} [get|auto|<address>]   Show, reset, or set custom IP/domain for links"
     echo -e "    ${GREEN}domain${NC} [get|clear|<host>] Show, clear, or change FakeTLS domain"
     echo -e "    ${GREEN}adtag${NC} [set <hex>|remove|view] Manage ad-tag"
     echo -e "    ${GREEN}geoblock${NC} [add|remove|list|clear] Manage geo-blocking"
@@ -4604,12 +4606,12 @@ cli_main() {
                     ;;
                 *)
                     check_root
-                    if [[ "$ip_arg" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$ip_arg" =~ ^[0-9a-fA-F:]+$ ]]; then
+                    if [[ "$ip_arg" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$ip_arg" =~ ^[0-9a-fA-F:]+$ ]] || [[ "$ip_arg" =~ ^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$ ]]; then
                         CUSTOM_IP="$ip_arg"
                         save_settings
-                        log_success "IP set to ${ip_arg}"
+                        log_success "IP/domain set to ${ip_arg}"
                     else
-                        log_error "Invalid IP address: ${ip_arg}"
+                        log_error "Invalid IP address or domain: ${ip_arg}"
                         return 1
                     fi
                     ;;
@@ -5404,12 +5406,12 @@ show_settings_menu() {
                     save_settings
                     log_success "IP reset to auto-detect (${_det_ip})"
                 elif [ -n "$ip" ]; then
-                    if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$ip" =~ ^[0-9a-fA-F:]+$ ]]; then
+                    if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$ip" =~ ^[0-9a-fA-F:]+$ ]] || [[ "$ip" =~ ^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$ ]]; then
                         CUSTOM_IP="$ip"
                         save_settings
-                        log_success "IP set to ${ip}"
+                        log_success "IP/domain set to ${ip}"
                     else
-                        log_error "Invalid IP address"
+                        log_error "Invalid IP address or domain"
                     fi
                 fi
                 press_any_key
