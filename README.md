@@ -579,4 +579,6 @@ If you find MTProxyMax useful, consider supporting its development:
 
 MIT License — see [LICENSE](LICENSE) for details.
 
+The **telemt engine** (included as a Docker image) is licensed under the [Telemt Public License 3 (TPL-3)](https://github.com/telemt/telemt/blob/main/LICENSE) — a permissive license that allows use, redistribution, and modification with attribution.
+
 Copyright (c) 2026 SamNet Technologies
