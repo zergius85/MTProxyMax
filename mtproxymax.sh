@@ -24,8 +24,8 @@ CONNECTION_LOG="${INSTALL_DIR}/connection.log"
 INSTANCES_FILE="${INSTALL_DIR}/instances.conf"
 CONTAINER_NAME="mtproxymax"
 DOCKER_IMAGE_BASE="mtproxymax-telemt"
-TELEMT_MIN_VERSION="3.3.28"
-TELEMT_COMMIT="342b011"  # Pinned: v3.3.28 — ME anti-stuck, quarantine fixes, orphan watchdog, dual-stack draining
+TELEMT_MIN_VERSION="3.3.30"
+TELEMT_COMMIT="22097f8"  # Pinned: v3.3.30 — TLS fetcher redesign, SNI validator, atomic quotas, PROXY trusted CIDRs
 GITHUB_REPO="SamNet-dev/MTProxyMax"
 REGISTRY_IMAGE="ghcr.io/samnet-dev/mtproxymax-telemt"
 
@@ -107,6 +107,7 @@ PROXY_MEMORY=""
 CUSTOM_IP=""
 FAKE_CERT_LEN=2048
 PROXY_PROTOCOL="false"
+PROXY_PROTOCOL_TRUSTED_CIDRS=""
 AD_TAG=""
 GEOBLOCK_MODE="blacklist"
 BLOCKLIST_COUNTRIES=""
@@ -571,6 +572,7 @@ PROXY_MEMORY='${PROXY_MEMORY}'
 CUSTOM_IP='${CUSTOM_IP}'
 FAKE_CERT_LEN='${FAKE_CERT_LEN}'
 PROXY_PROTOCOL='${PROXY_PROTOCOL}'
+PROXY_PROTOCOL_TRUSTED_CIDRS='${PROXY_PROTOCOL_TRUSTED_CIDRS}'
 
 # Ad-Tag (from @MTProxyBot)
 AD_TAG='${AD_TAG}'
@@ -623,7 +625,7 @@ load_settings() {
         # Whitelist of allowed keys
         case "$key" in
             PROXY_PORT|PROXY_METRICS_PORT|PROXY_DOMAIN|PROXY_CONCURRENCY|\
-            PROXY_CPUS|PROXY_MEMORY|CUSTOM_IP|FAKE_CERT_LEN|PROXY_PROTOCOL|AD_TAG|GEOBLOCK_MODE|BLOCKLIST_COUNTRIES|\
+            PROXY_CPUS|PROXY_MEMORY|CUSTOM_IP|FAKE_CERT_LEN|PROXY_PROTOCOL|PROXY_PROTOCOL_TRUSTED_CIDRS|AD_TAG|GEOBLOCK_MODE|BLOCKLIST_COUNTRIES|\
             MASKING_ENABLED|MASKING_HOST|MASKING_PORT|\
             TELEGRAM_ENABLED|TELEGRAM_BOT_TOKEN|TELEGRAM_CHAT_ID|\
             TELEGRAM_INTERVAL|TELEGRAM_ALERTS_ENABLED|TELEGRAM_SERVER_LABEL|\
@@ -1064,6 +1066,7 @@ port = ${port}
 listen_addr_ipv4 = "0.0.0.0"
 listen_addr_ipv6 = "::"
 proxy_protocol = ${PROXY_PROTOCOL:-false}
+$([ "$PROXY_PROTOCOL" = "true" ] && [ -n "$PROXY_PROTOCOL_TRUSTED_CIDRS" ] && echo "proxy_protocol_trusted_cidrs = [$(echo "$PROXY_PROTOCOL_TRUSTED_CIDRS" | sed 's/[[:space:]]*,[[:space:]]*/", "/g;s/^/"/;s/$/"/' )]")
 metrics_port = ${metrics_port}
 metrics_whitelist = ["127.0.0.1", "::1"]
 
@@ -3553,7 +3556,7 @@ load_tg_settings() {
             local key="${BASH_REMATCH[1]}" val="${BASH_REMATCH[2]}"
             case "$key" in
                 PROXY_PORT|PROXY_DOMAIN|PROXY_METRICS_PORT|PROXY_CONCURRENCY|\
-                PROXY_CPUS|PROXY_MEMORY|CUSTOM_IP|PROXY_PROTOCOL|MASKING_ENABLED|MASKING_HOST|MASKING_PORT|\
+                PROXY_CPUS|PROXY_MEMORY|CUSTOM_IP|PROXY_PROTOCOL|PROXY_PROTOCOL_TRUSTED_CIDRS|MASKING_ENABLED|MASKING_HOST|MASKING_PORT|\
                 AD_TAG|GEOBLOCK_MODE|BLOCKLIST_COUNTRIES|AUTO_UPDATE_ENABLED|\
                 TELEGRAM_ENABLED|TELEGRAM_BOT_TOKEN|TELEGRAM_CHAT_ID|\
                 TELEGRAM_INTERVAL|TELEGRAM_SERVER_LABEL|TELEGRAM_ALERTS_ENABLED)
@@ -6116,7 +6119,7 @@ show_settings_menu() {
         echo -e "  ${BOLD}Masking:${NC}     ${MASKING_ENABLED}"
         echo -e "  ${BOLD}Ad-tag:${NC}      ${AD_TAG:-${DIM}not set${NC}}"
         echo -e "  ${BOLD}Auto-update:${NC} ${AUTO_UPDATE_ENABLED}"
-        echo -e "  ${BOLD}PROXY proto:${NC} ${PROXY_PROTOCOL}"
+        echo -e "  ${BOLD}PROXY proto:${NC} ${PROXY_PROTOCOL}$([ "$PROXY_PROTOCOL" = "true" ] && [ -n "$PROXY_PROTOCOL_TRUSTED_CIDRS" ] && echo " (trusted: ${PROXY_PROTOCOL_TRUSTED_CIDRS})")"
         echo -e "  ${BOLD}Engine:${NC}      telemt v$(get_telemt_version)"
         echo ""
         echo -e "  ${DIM}[1]${NC} Change port"
@@ -6273,6 +6276,13 @@ show_settings_menu() {
                 ;;
             8)
                 [ "$PROXY_PROTOCOL" = "true" ] && PROXY_PROTOCOL="false" || PROXY_PROTOCOL="true"
+                if [ "$PROXY_PROTOCOL" = "true" ]; then
+                    echo -en "  ${BOLD}Trusted CIDRs (comma-separated, e.g. 10.0.0.0/8,172.16.0.0/12, empty=reject all):${NC} "
+                    local cidrs; read -r cidrs
+                    PROXY_PROTOCOL_TRUSTED_CIDRS="$cidrs"
+                else
+                    PROXY_PROTOCOL_TRUSTED_CIDRS=""
+                fi
                 save_settings
                 log_success "PROXY protocol: ${PROXY_PROTOCOL}"
                 if is_proxy_running; then

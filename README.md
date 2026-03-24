@@ -535,25 +535,21 @@ mtproxymax telegram remove              # Remove bot completely
 - **`--no-restart` flag** — `secret add/remove/add-batch/remove-batch --no-restart` for scripting and automation
 - **TUI options** — Interactive menu options [6] and [7] for batch operations
 
-### v1.0.0 — Engine v3.3.28
+### v1.0.0 — Engine v3.3.30
 
-**Engine Upgrade (v3.3.3 → v3.3.28):**
+**Engine Upgrade (v3.3.28 → v3.3.30):**
 
-- **ME Anti-Stuck + Orphan Watchdog** — Root cause fix for random connection drops: writer cleanup races resolved, orphaned writers detected and force-closed
-- **Quarantine Fixes** — Quarantined endpoints no longer bypass the circuit breaker, preventing flapping reconnection loops
-- **Authoritative Teardown** — New deterministic writer teardown sequence with force-close safety policy
-- **ME Draining on Dual-Stack** — Proper draining behavior on IPv4+IPv6 servers
-- **TLS Fetcher Upstream Selection** — Smarter upstream selection for TLS fetching
-- **Teardown Monitoring** — New API and Prometheus metrics for writer teardown visibility
-- **Instadrain + Hard-Remove** — Writers stuck draining are force-removed instead of hanging
+- **TLS Fetcher Redesign** — Adaptive profile cascade (Chrome → Firefox → TLS 1.2 → legacy) with per-target caching, automatic fallback on handshake failures — significantly harder to fingerprint/block via DPI
+- **TLS SNI Validator** — Enforces SNI from configured domain, drops invalid probes cheaply
+- **Atomic Per-User Quotas** — Removed locking from hot path for better throughput under load
+- **PROXY Protocol Trusted CIDRs** — Restrict PROXY header trust to specific source networks
+- **DPI Evasion Hardening** — Shape/timing hardening, masking prefetch, tiny-frame debt protection
+- **Shadowsocks Upstream** — New upstream transport option alongside SOCKS5
+- **ME Anti-Stuck + Orphan Watchdog** — Root cause fix for random connection drops
 - **Adaptive Buffers** — Dynamic buffer sizing: less RAM at low load, more throughput at high load
 - **Flow Performance** — 3x faster D2C flush + immediate ACK flushing for lower latency
-- **Hot-Reload Fixes** — Reliable config reload without restart
 - **Event-Driven ME** — Pool switches from busy-polling to event-driven, reducing CPU on idle servers
-- **CPU/RAM Hot-Path Optimization** — Removed hot-path obstacles for lower resource usage under load
-- **Source-IP ME Routing** — Routing decisions factor in source IP for multi-homed servers
 - **ME/DC Reroute** — Dynamic rerouting when preferred datacenter path degrades
-- **Per-Upstream Runtime Selftest** — Built-in diagnostics for upstream connectivity
 
 ### v1.0.0 — Per-User Limits + Telegram Bot
 
