@@ -24,8 +24,8 @@ CONNECTION_LOG="${INSTALL_DIR}/connection.log"
 INSTANCES_FILE="${INSTALL_DIR}/instances.conf"
 CONTAINER_NAME="mtproxymax"
 DOCKER_IMAGE_BASE="mtproxymax-telemt"
-TELEMT_MIN_VERSION="3.3.30"
-TELEMT_COMMIT="22097f8"  # Pinned: v3.3.30 — TLS fetcher redesign, SNI validator, atomic quotas, PROXY trusted CIDRs
+TELEMT_MIN_VERSION="3.3.31"
+TELEMT_COMMIT="aed7ba1"  # Pinned: v3.3.31 — build optimizations, unknown SNI logged as WARN
 GITHUB_REPO="SamNet-dev/MTProxyMax"
 REGISTRY_IMAGE="ghcr.io/samnet-dev/mtproxymax-telemt"
 
