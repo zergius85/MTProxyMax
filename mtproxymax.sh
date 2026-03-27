@@ -1523,38 +1523,42 @@ flush_traffic_to_disk() {
     [[ "${snap_gout:-0}" =~ ^[0-9]+$ ]] || snap_gout=0
 
     # Fetch current live metrics
-    local _metrics
-    _metrics=$(curl -s --max-time 2 "http://127.0.0.1:${PROXY_METRICS_PORT:-9090}/metrics" 2>/dev/null) || { exec 9>&-; return; }
-    [ -z "$_metrics" ] && { exec 9>&-; return; }
+    local _metrics _have_metrics=false
+    _metrics=$(curl -s --max-time 2 "http://127.0.0.1:${PROXY_METRICS_PORT:-9090}/metrics" 2>/dev/null) || true
+    [ -n "$_metrics" ] && _have_metrics=true
 
-    # Global traffic delta
-    local cur_gin cur_gout
-    cur_gin=$(echo "$_metrics" | awk '/^telemt_user_octets_from_client\{/{s+=$NF}END{printf "%.0f",s}')
-    cur_gout=$(echo "$_metrics" | awk '/^telemt_user_octets_to_client\{/{s+=$NF}END{printf "%.0f",s}')
-    cur_gin=${cur_gin:-0}; cur_gout=${cur_gout:-0}
-    local gd_in=$((cur_gin - snap_gin)) gd_out=$((cur_gout - snap_gout))
-    [ "$gd_in" -lt 0 ] 2>/dev/null && gd_in=$cur_gin
-    [ "$gd_out" -lt 0 ] 2>/dev/null && gd_out=$cur_gout
-    cum_in=$((cum_in + gd_in))
-    cum_out=$((cum_out + gd_out))
+    if $_have_metrics; then
+        # Global traffic delta
+        local cur_gin cur_gout
+        cur_gin=$(echo "$_metrics" | awk '/^telemt_user_octets_from_client\{/{s+=$NF}END{printf "%.0f",s}')
+        cur_gout=$(echo "$_metrics" | awk '/^telemt_user_octets_to_client\{/{s+=$NF}END{printf "%.0f",s}')
+        cur_gin=${cur_gin:-0}; cur_gout=${cur_gout:-0}
+        local gd_in=$((cur_gin - snap_gin)) gd_out=$((cur_gout - snap_gout))
+        [ "$gd_in" -lt 0 ] 2>/dev/null && gd_in=$cur_gin
+        [ "$gd_out" -lt 0 ] 2>/dev/null && gd_out=$cur_gout
+        cum_in=$((cum_in + gd_in))
+        cum_out=$((cum_out + gd_out))
 
-    # Per-user traffic delta
-    [ -f "$SECRETS_FILE" ] && while IFS='|' read -r label secret created enabled _mc _mi _q _ex _notes; do
-        [[ "$label" =~ ^# ]] && continue; [ -z "$secret" ] && continue
-        [ "$enabled" != "true" ] && continue
-        local ui uo
-        ui=$(echo "$_metrics" | awk -v u="$label" '$0 ~ "^telemt_user_octets_from_client\\{.*user=\"" u "\"" {print $NF}')
-        uo=$(echo "$_metrics" | awk -v u="$label" '$0 ~ "^telemt_user_octets_to_client\\{.*user=\"" u "\"" {print $NF}')
-        ui=${ui:-0}; uo=${uo:-0}
-        local si=${_fu_snap_in["$label"]:-0} so=${_fu_snap_out["$label"]:-0}
-        local di=$((ui - si)) doo=$((uo - so))
-        [ "$di" -lt 0 ] 2>/dev/null && di=$ui
-        [ "$doo" -lt 0 ] 2>/dev/null && doo=$uo
-        _fu_cum_in["$label"]=$(( ${_fu_cum_in["$label"]:-0} + di ))
-        _fu_cum_out["$label"]=$(( ${_fu_cum_out["$label"]:-0} + doo ))
-        _fu_snap_in["$label"]=$ui
-        _fu_snap_out["$label"]=$uo
-    done < "$SECRETS_FILE"
+        # Per-user traffic delta
+        [ -f "$SECRETS_FILE" ] && while IFS='|' read -r label secret created enabled _mc _mi _q _ex _notes; do
+            [[ "$label" =~ ^# ]] && continue; [ -z "$secret" ] && continue
+            [ "$enabled" != "true" ] && continue
+            local ui uo
+            ui=$(echo "$_metrics" | awk -v u="$label" '$0 ~ "^telemt_user_octets_from_client\\{.*user=\"" u "\"" {print $NF}')
+            uo=$(echo "$_metrics" | awk -v u="$label" '$0 ~ "^telemt_user_octets_to_client\\{.*user=\"" u "\"" {print $NF}')
+            ui=${ui:-0}; uo=${uo:-0}
+            local si=${_fu_snap_in["$label"]:-0} so=${_fu_snap_out["$label"]:-0}
+            local di=$((ui - si)) doo=$((uo - so))
+            [ "$di" -lt 0 ] 2>/dev/null && di=$ui
+            [ "$doo" -lt 0 ] 2>/dev/null && doo=$uo
+            _fu_cum_in["$label"]=$(( ${_fu_cum_in["$label"]:-0} + di ))
+            _fu_cum_out["$label"]=$(( ${_fu_cum_out["$label"]:-0} + doo ))
+            _fu_snap_in["$label"]=$ui
+            _fu_snap_out["$label"]=$uo
+        done < "$SECRETS_FILE"
+    fi
+    # If metrics unavailable, still save existing cumulative (don't lose what we have)
+    # Snapshot resets to 0 so next session starts fresh
 
     # Write cumulative traffic
     local _tmp
@@ -1571,18 +1575,28 @@ flush_traffic_to_disk() {
     done
     mv "$_tmp" "$_utf" 2>/dev/null || rm -f "$_tmp"
 
-    # Write per-user snapshot
+    # Write per-user snapshot (reset to 0 if metrics were unavailable)
     _tmp=$(mktemp "${_stats_dir}/.traffic.XXXXXX" 2>/dev/null) || { exec 9>&-; return; }
     chmod 600 "$_tmp"
-    for _l in "${!_fu_snap_in[@]}"; do
-        echo "${_l}|${_fu_snap_in[$_l]}|${_fu_snap_out[$_l]}" >> "$_tmp"
-    done
+    if $_have_metrics; then
+        for _l in "${!_fu_snap_in[@]}"; do
+            echo "${_l}|${_fu_snap_in[$_l]}|${_fu_snap_out[$_l]}" >> "$_tmp"
+        done
+    else
+        for _l in "${!_fu_cum_in[@]}"; do
+            echo "${_l}|0|0" >> "$_tmp"
+        done
+    fi
     mv "$_tmp" "$_snap" 2>/dev/null || rm -f "$_tmp"
 
-    # Write global snapshot
+    # Write global snapshot (reset to 0 if metrics were unavailable)
     _tmp=$(mktemp "${_stats_dir}/.traffic.XXXXXX" 2>/dev/null) || { exec 9>&-; return; }
     chmod 600 "$_tmp"
-    echo "${cur_gin}|${cur_gout}" > "$_tmp"
+    if $_have_metrics; then
+        echo "${cur_gin}|${cur_gout}" > "$_tmp"
+    else
+        echo "0|0" > "$_tmp"
+    fi
     mv "$_tmp" "${_stats_dir}/global_traffic_snapshot" 2>/dev/null || rm -f "$_tmp"
     exec 9>&-  # Release lock
 }
