@@ -40,6 +40,7 @@ Most MTProxy tools give you a proxy and a link. That's it. MTProxyMax gives you 
 
 - 🔐 **Multi-user secrets** with individual bandwidth quotas, device limits, and expiry dates
 - 🤖 **Telegram bot** with 17 commands — manage everything from your phone
+- 🗂️ **Replication** — sync config to slave servers automatically via rsync+SSH
 - 🖥️ **Interactive TUI** — no need to memorize commands, menu-driven setup
 - 📊 **Prometheus metrics** — real per-user traffic stats, not just iptables guesses
 - 🔗 **Proxy chaining** — route through SOCKS5 upstreams for extra privacy
@@ -224,6 +225,47 @@ mtproxymax telegram setup
 
 ---
 
+### 🗂️ Replication (Master-Slave Config Sync)
+
+Keep multiple proxy servers in sync automatically. The master pushes config changes to all slaves via rsync+SSH on a configurable interval. Slaves receive `secrets.conf`, `upstreams.conf`, `instances.conf`, and `config.toml` — their own role settings and local state are never overwritten.
+
+**Setup takes two commands:**
+
+```bash
+# On master — run wizard, select Master, add slave
+mtproxymax replication setup
+
+# On slave — run wizard, select Slave
+mtproxymax replication setup
+```
+
+**How it works:**
+- Master generates a self-contained sync script at `/opt/mtproxymax/mtproxymax-sync.sh`
+- A systemd timer fires every N seconds (default: 60) and runs the sync
+- On change — proxy container on slave is automatically restarted
+- `settings.conf` and `replication.conf` are always excluded — slave role is never overwritten
+
+```bash
+mtproxymax replication status     # Show role, timer state, last sync
+mtproxymax replication sync       # Trigger immediate sync
+mtproxymax replication logs       # View sync log
+mtproxymax replication test       # Test SSH connectivity to all slaves
+mtproxymax replication promote    # Promote slave to master (failover)
+```
+
+**Roles:**
+
+| Role | Description |
+|------|-------------|
+| **Master** | Pushes config to slaves on schedule |
+| **Slave** | Receives config, read-only. Changes must be made on master |
+| **Standalone** | Replication disabled (default) |
+
+---
+
+
+---
+
 ### 🔗 Proxy Chaining (Upstream Routing)
 
 Route traffic through intermediate servers:
@@ -307,6 +349,7 @@ Engine updates are delivered through `mtproxymax update`. Pre-built multi-arch D
 | **Telegram Bot** | ✅ (17 commands) | ❌ | ❌ | ❌ |
 | **Interactive TUI** | ✅ | ❌ | ❌ | ❌ |
 | **Proxy Chaining** | ✅ (SOCKS5/4, weighted) | ✅ (SOCKS5) | ❌ | ❌ |
+| **Master-Slave Replication** | ✅ (rsync+SSH, systemd) | ❌ | ❌ | ❌ |
 | **Geo-Blocking** | ✅ | IP allowlist/blocklist | ❌ | ❌ |
 | **Ad-Tag Support** | ✅ | ❌ (removed in v2) | ✅ | Varies |
 | **QR Code Generation** | ✅ | ❌ | ❌ | Some |
@@ -369,6 +412,16 @@ Telegram Client
           │
           ▼
    Telegram Servers
+
+
+Master-Slave Replication (optional):
+
+  Master Server              Slave Server(s)
+  ┌──────────────┐           ┌──────────────┐
+  │ mtproxymax   │──rsync──▶ │ mtproxymax   │
+  │ (systemd     │   +SSH    │ (receives    │
+  │  timer 60s)  │           │  config)     │
+  └──────────────┘           └──────────────┘
 ```
 
 | Component | Role |
@@ -376,6 +429,7 @@ Telegram Client
 | **mtproxymax.sh** | Single bash script: CLI, TUI, config manager |
 | **telemt** | Rust MTProto engine running inside Docker |
 | **Telegram bot service** | Independent systemd service polling Bot API |
+| **Replication sync service** | systemd timer pushing config to slave servers |
 | **Prometheus endpoint** | `/metrics` on port 9090 (localhost only) |
 
 ---
@@ -425,6 +479,27 @@ mtproxymax ip [get|auto|<address>]      # Get/set custom IP for proxy links
 mtproxymax domain [get|clear|<host>]    # Get/set FakeTLS domain
 mtproxymax adtag set <hex>              # Set ad-tag
 mtproxymax adtag remove                 # Remove ad-tag
+```
+
+</details>
+
+
+<details>
+<summary><b>Replication</b></summary>
+
+```bash
+mtproxymax replication setup            # Interactive wizard (master/slave/standalone)
+mtproxymax replication status           # Role, timer state, last sync, slave list
+mtproxymax replication add <host> [port] [label]   # Register a slave server
+mtproxymax replication remove <host_or_label>      # Remove a slave
+mtproxymax replication list             # List all slaves
+mtproxymax replication enable           # Enable sync timer
+mtproxymax replication disable          # Disable sync timer
+mtproxymax replication sync             # Trigger immediate sync
+mtproxymax replication test [host]      # Test SSH connectivity to slave(s)
+mtproxymax replication logs             # Show sync log
+mtproxymax replication reset            # Remove all replication config
+mtproxymax replication promote          # Promote slave to master (failover)
 ```
 
 </details>
@@ -510,7 +585,15 @@ mtproxymax telegram remove              # Remove bot completely
 
 ## 📋 Changelog
 
-### v1.0.4 — Engine v3.3.32, SNI Policy & Metrics Dashboard
+### v1.0.4 — Replication, Engine v3.3.32, SNI Policy & Metrics Dashboard
+
+- **Replication** — sync config from master to slave servers via rsync+SSH with systemd timer
+- **Auto-exclude** — `settings.conf` and `replication.conf` are never synced to slaves, preserving their role and local state
+- **Wizard** — interactive setup for master, slave, and standalone roles
+- **Slave protection** — setting slave role stops any local sync timer and clears stale peer list
+- **Promote** — `mtproxymax replication promote` for manual failover (slave → master)
+- **Role guards** — `replication add/remove/sync` are blocked with a clear error on slave servers
+- **Sync script auto-update** — manual `sync` always regenerates the script from current binary
 
 **Engine Upgrade (v3.3.31 → v3.3.32):**
 
