@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки - MTProxyMax</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f3460;
+            --text-primary: #eee;
+            --text-secondary: #bbb;
+            --accent: #e94560;
+            --accent-hover: #ff6b6b;
+            --success: #4ecca3;
+            --warning: #ffc107;
+            --danger: #ff4757;
+            --border: #2a2a4e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: var(--bg-card);
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: var(--accent);
+            text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+        }
+
+        h1 span {
+            color: var(--text-primary);
+            font-size: 1rem;
+            display: block;
+            margin-top: 5px;
+        }
+
+        nav {
+            display: flex;
+            gap: 15px;
+        }
+
+        nav a {
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            background: var(--bg-secondary);
+            transition: all 0.3s;
+        }
+
+        nav a:hover, nav a.active {
+            background: var(--accent);
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid var(--border);
+        }
+
+        .card h2 {
+            color: var(--accent);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+            text-decoration: none;
+            color: white;
+        }
+
+        .btn-success { background: var(--success); }
+        .btn-success:hover { background: #3ba884; }
+
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #ff6b7a; }
+
+        .btn-warning { background: var(--warning); color: #000; }
+        .btn-warning:hover { background: #ffca2c; }
+
+        .btn-primary { background: var(--accent); }
+        .btn-primary:hover { background: var(--accent-hover); }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-group .hint {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert-success {
+            background: rgba(78, 204, 163, 0.2);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+
+        .alert-error {
+            background: rgba(255, 71, 87, 0.2);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .status-row:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            color: var(--text-secondary);
+        }
+
+        .status-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .toggle {
+            position: relative;
+            width: 60px;
+            height: 30px;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border);
+            transition: 0.3s;
+            border-radius: 30px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--success);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(30px);
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>
+                MTProxyMax
+                <span>Настройки прокси</span>
+            </h1>
+            <nav>
+                <a href="/">Главная</a>
+                <a href="/secrets">Секреты</a>
+                <a href="/settings" class="active">Настройки</a>
+                <a href="/logs">Логи</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div id="alert-container"></div>
+
+        <div class="card">
+            <h2>⚙️ Основные настройки</h2>
+            
+            <form id="settings-form" onsubmit="saveSettings(event)">
+                <div class="form-group">
+                    <label for="port">Порт прокси</label>
+                    <input type="number" id="port" name="port" value="443" min="1" max="65535" required>
+                    <div class="hint">Порт, на котором будет работать MTProto прокси (рекомендуется 443)</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="domain">FakeTLS домен</label>
+                    <input type="text" id="domain" name="domain" value="cloudflare.com" required>
+                    <div class="hint">Домен для маскировки трафика (рекомендуется cloudflare.com)</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="custom_ip">Публичный IP (опционально)</label>
+                    <input type="text" id="custom_ip" name="custom_ip" placeholder="1.2.3.4">
+                    <div class="hint">Оставьте пустым для автоопределения. Укажите, если сервер за NAT</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="adtag">Ad-Tag (монетизация)</label>
+                    <input type="text" id="adtag" name="adtag" placeholder="00000000000000000000000000000000">
+                    <div class="hint">Получите в @MTProxyBot. Оставьте пустым, если не нужно</div>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>Маскировка трафика</span>
+                            <label class="toggle">
+                                <input type="checkbox" id="masking" name="masking" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </label>
+                    <div class="hint">Включите для обхода DPI. Трафик будет выглядеть как HTTPS</div>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>PROXY Protocol</span>
+                            <label class="toggle">
+                                <input type="checkbox" id="proxy_protocol" name="proxy_protocol">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </label>
+                    <div class="hint">Включите, если прокси за HAProxy или nginx</div>
+                </div>
+
+                <div class="btn-group" style="margin-top: 30px;">
+                    <button type="submit" class="btn btn-success">💾 Сохранить</button>
+                    <button type="button" class="btn btn-warning" onclick="loadSettings()">↻ Сбросить</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>📊 Текущая конфигурация</h2>
+            
+            <div class="status-row">
+                <span class="status-label">Версия telemt</span>
+                <span class="status-value" id="engine-version">—</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Статус движка</span>
+                <span class="status-value" id="engine-status">—</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">PID процесса</span>
+                <span class="status-value" id="engine-pid">—</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Порт</span>
+                <span class="status-value" id="status-port">—</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Домен</span>
+                <span class="status-value" id="status-domain">—</span>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>MTProxyMax v1.0.4 | &copy; 2026 SamNet Technologies</p>
+    </footer>
+
+    <script>
+        const API_BASE = '/api';
+
+        // Утилиты
+        function showAlert(message, type = 'success') {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            
+            const container = document.getElementById('alert-container');
+            container.insertBefore(alert, container.firstChild);
+            
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        async function apiRequest(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers,
+                    },
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Ошибка запроса');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                showAlert(error.message, 'error');
+                throw error;
+            }
+        }
+
+        // Загрузка настроек
+        async function loadSettings() {
+            try {
+                const settings = await apiRequest('/settings');
+                
+                document.getElementById('port').value = settings.port || 443;
+                document.getElementById('domain').value = settings.domain || 'cloudflare.com';
+                document.getElementById('custom_ip').value = settings.custom_ip || '';
+                document.getElementById('adtag').value = settings.ad_tag || '';
+                document.getElementById('masking').checked = settings.masking_enabled !== false;
+                document.getElementById('proxy_protocol').checked = settings.proxy_protocol || false;
+                
+                // Загрузка статуса движка
+                const engine = await apiRequest('/engine/status');
+                document.getElementById('engine-version').textContent = engine.version || '—';
+                document.getElementById('engine-status').textContent = engine.running ? '🟢 Запущен' : '🔴 Остановлен';
+                document.getElementById('engine-status').style.color = engine.running ? 'var(--success)' : 'var(--danger)';
+                document.getElementById('engine-pid').textContent = engine.pid || '—';
+                
+                // Обновление статусной информации
+                document.getElementById('status-port').textContent = settings.port || '—';
+                document.getElementById('status-domain').textContent = settings.domain || '—';
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+
+        // Сохранение настроек
+        async function saveSettings(event) {
+            event.preventDefault();
+            
+            const settings = {
+                port: parseInt(document.getElementById('port').value),
+                domain: document.getElementById('domain').value,
+                custom_ip: document.getElementById('custom_ip').value,
+                ad_tag: document.getElementById('adtag').value,
+                masking_enabled: document.getElementById('masking').checked,
+                proxy_protocol: document.getElementById('proxy_protocol').checked,
+            };
+            
+            try {
+                await apiRequest('/settings', {
+                    method: 'PUT',
+                    body: JSON.stringify(settings)
+                });
+                
+                showAlert('Настройки сохранены');
+                
+                // Если прокси запущен, предложим перезапустить
+                const engine = await apiRequest('/engine/status');
+                if (engine.running) {
+                    if (confirm('Прокси запущен. Перезапустить для применения настроек?')) {
+                        await apiRequest('/engine/restart', { method: 'POST' });
+                        showAlert('Прокси перезапущен');
+                    }
+                }
+                
+                loadSettings();
+            } catch (error) {
+                // Ошибка уже показана
+            }
+        }
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', loadSettings);
+    </script>
+</body>
+</html>

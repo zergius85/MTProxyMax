@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Логи - MTProxyMax</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f3460;
+            --text-primary: #eee;
+            --text-secondary: #bbb;
+            --accent: #e94560;
+            --accent-hover: #ff6b6b;
+            --success: #4ecca3;
+            --warning: #ffc107;
+            --danger: #ff4757;
+            --border: #2a2a4e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: var(--bg-card);
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: var(--accent);
+            text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+        }
+
+        h1 span {
+            color: var(--text-primary);
+            font-size: 1rem;
+            display: block;
+            margin-top: 5px;
+        }
+
+        nav {
+            display: flex;
+            gap: 15px;
+        }
+
+        nav a {
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            background: var(--bg-secondary);
+            transition: all 0.3s;
+        }
+
+        nav a:hover, nav a.active {
+            background: var(--accent);
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid var(--border);
+        }
+
+        .card h2 {
+            color: var(--accent);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+            text-decoration: none;
+            color: white;
+        }
+
+        .btn-success { background: var(--success); }
+        .btn-success:hover { background: #3ba884; }
+
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #ff6b7a; }
+
+        .btn-warning { background: var(--warning); color: #000; }
+        .btn-warning:hover { background: #ffca2c; }
+
+        .btn-primary { background: var(--accent); }
+        .btn-primary:hover { background: var(--accent-hover); }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .logs-container {
+            background: var(--bg-secondary);
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+
+        .log-line {
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 15px;
+        }
+
+        .log-line:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .log-level {
+            font-weight: 600;
+            white-space: nowrap;
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+
+        .log-level.info {
+            background: rgba(78, 204, 163, 0.2);
+            color: var(--success);
+        }
+
+        .log-level.warn {
+            background: rgba(255, 193, 7, 0.2);
+            color: var(--warning);
+        }
+
+        .log-level.error {
+            background: rgba(255, 71, 87, 0.2);
+            color: var(--danger);
+        }
+
+        .log-level.debug {
+            background: rgba(233, 69, 96, 0.2);
+            color: var(--accent);
+        }
+
+        .log-message {
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+
+        .log-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .log-controls label {
+            color: var(--text-secondary);
+        }
+
+        .auto-scroll-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--accent);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+            z-index: 100;
+        }
+
+        .auto-scroll-indicator.active {
+            display: block;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>
+                MTProxyMax
+                <span>Логи прокси</span>
+            </h1>
+            <nav>
+                <a href="/">Главная</a>
+                <a href="/secrets">Секреты</a>
+                <a href="/settings">Настройки</a>
+                <a href="/logs" class="active">Логи</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="card">
+            <h2>📋 Логи MTProxyMax</h2>
+            
+            <div class="log-controls">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="log-lines">Строк:</label>
+                    <select id="log-lines" onchange="loadLogs()">
+                        <option value="50">50</option>
+                        <option value="100" selected>100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="log-filter">Фильтр:</label>
+                    <input type="text" id="log-filter" placeholder="Поиск..." oninput="filterLogs()" style="width: 200px;">
+                </div>
+                
+                <div class="btn-group" style="margin: 0;">
+                    <button class="btn btn-primary" onclick="loadLogs()">🔄 Обновить</button>
+                    <button class="btn btn-success" id="auto-scroll-btn" onclick="toggleAutoScroll()">⏬ Авто-скролл: ВКЛ</button>
+                    <button class="btn btn-warning" onclick="downloadLogs()">💾 Скачать</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="logs-container" id="logs-container">
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    Загрузка логов...
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="auto-scroll-indicator" id="auto-scroll-indicator" onclick="scrollToBottom()">
+        ⬇ Прокрутить вниз
+    </div>
+
+    <footer>
+        <p>MTProxyMax v1.0.4 | &copy; 2026 SamNet Technologies</p>
+    </footer>
+
+    <script>
+        const API_BASE = '/api';
+        let autoScroll = true;
+        let allLogs = [];
+
+        // Утилиты
+        async function apiRequest(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers,
+                    },
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Ошибка запроса');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+
+        // Загрузка логов
+        async function loadLogs() {
+            const lines = document.getElementById('log-lines').value;
+            
+            try {
+                const data = await apiRequest(`/logs?lines=${lines}`);
+                allLogs = data.logs || [];
+                renderLogs(allLogs);
+                
+                if (autoScroll) {
+                    scrollToBottom();
+                }
+            } catch (error) {
+                document.getElementById('logs-container').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--danger);">
+                        ❌ Ошибка загрузки логов: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Отрисовка логов
+        function renderLogs(logs) {
+            const container = document.getElementById('logs-container');
+            
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        Логов нет
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = logs.map(line => {
+                const parsed = parseLogLine(line);
+                return `
+                    <div class="log-line">
+                        <span class="log-time">${parsed.time}</span>
+                        <span class="log-level ${parsed.level}">${parsed.level.toUpperCase()}</span>
+                        <span class="log-message">${escapeHtml(parsed.message)}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Парсинг строки лога
+        function parseLogLine(line) {
+            // Пример: 2024-01-15 10:30:45 INFO [telemt] Client connected
+            const regex = /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(INFO|WARN|ERROR|DEBUG)\s+(.*)$/i;
+            const match = line.match(regex);
+            
+            if (match) {
+                return {
+                    time: match[1],
+                    level: match[2].toLowerCase(),
+                    message: match[3]
+                };
+            }
+            
+            // Если не удалось распарсить, возвращаем как есть
+            return {
+                time: '',
+                level: 'info',
+                message: line
+            };
+        }
+
+        // Фильтрация логов
+        function filterLogs() {
+            const filter = document.getElementById('log-filter').value.toLowerCase();
+            
+            if (!filter) {
+                renderLogs(allLogs);
+                return;
+            }
+            
+            const filtered = allLogs.filter(line => line.toLowerCase().includes(filter));
+            renderLogs(filtered);
+        }
+
+        // Авто-скролл
+        function toggleAutoScroll() {
+            autoScroll = !autoScroll;
+            const btn = document.getElementById('auto-scroll-btn');
+            btn.textContent = autoScroll ? '⏬ Авто-скролл: ВКЛ' : '⏸️ Авто-скролл: ВЫКЛ';
+            btn.className = autoScroll ? 'btn btn-success' : 'btn btn-warning';
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('logs-container');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Скачать логи
+        function downloadLogs() {
+            const blob = new Blob([allLogs.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mtproxymax-logs-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Проверка автоскролла
+        document.getElementById('logs-container').addEventListener('scroll', function() {
+            const container = this;
+            const indicator = document.getElementById('auto-scroll-indicator');
+            
+            const isScrolledToBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+            
+            if (!isScrolledToBottom && allLogs.length > 0) {
+                indicator.classList.add('active');
+            } else {
+                indicator.classList.remove('active');
+            }
+        });
+
+        // Авто-обновление каждые 5 секунд
+        let refreshInterval;
+        
+        function startAutoRefresh() {
+            refreshInterval = setInterval(() => {
+                if (autoScroll) {
+                    loadLogs();
+                }
+            }, 5000);
+        }
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', () => {
+            loadLogs();
+            startAutoRefresh();
+        });
+    </script>
+</body>
+</html>

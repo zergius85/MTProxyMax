@@ -1,0 +1,15 @@
+[Unit]
+Description=MTProxyMax Web Interface
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/mtproxymax/web
+Environment="PATH=/opt/mtproxymax/web/venv/bin:/usr/bin:/bin"
+ExecStart=/opt/mtproxymax/web/venv/bin/python /opt/mtproxymax/web/app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
