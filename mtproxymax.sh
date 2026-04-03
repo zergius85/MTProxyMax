@@ -1106,7 +1106,7 @@ $([ -n "$ad_tag" ] && echo "ad_tag = \"$ad_tag\"" || echo "# ad_tag = \"\"  # Ge
 
 [general.modes]
 classic = false
-secure = false
+secure = $([ "$mask_enabled" = "false" ] && echo "true" || echo "false")
 tls = true
 
 [general.links]
