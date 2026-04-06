@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(github.com)",
+      "WebFetch(raw.githubusercontent.com)",
+      "Bash(select-object *)",
+      "Bash(git fetch *)",
+      "Bash(git diff *)",
+      "Bash(git merge *)",
+      "Bash(bash *)",
+      "Bash(\"c:\\program files\\git\\bin\\bash.exe\" *)",
+      "Bash(cmd *)",
+      "Bash(python *)",
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  },
+  "$version": 3
+}
