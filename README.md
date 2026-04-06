@@ -40,6 +40,7 @@ Most MTProxy tools give you a proxy and a link. That's it. MTProxyMax gives you 
 
 - 🔐 **Multi-user secrets** with individual bandwidth quotas, device limits, and expiry dates
 - 🤖 **Telegram bot** with 17 commands — manage everything from your phone
+- 🗂️ **Replication** — sync config to slave servers automatically via rsync+SSH
 - 🖥️ **Interactive TUI** — no need to memorize commands, menu-driven setup
 - 📊 **Prometheus metrics** — real per-user traffic stats, not just iptables guesses
 - 🔗 **Proxy chaining** — route through SOCKS5 upstreams for extra privacy
@@ -102,12 +103,12 @@ Fine-grained limits enforced at the engine level:
 
 | Limit | Description | Example | Best For |
 |-------|-------------|---------|----------|
-| **Max Connections** | Concurrent connections (1 app = 1 conn) | `3` | **Device limiting** |
+| **Max Connections** | Concurrent TCP connections (~3 per device) | `15` | **Device limiting** |
 | **Max IPs** | Unique IP addresses allowed | `5` | Anti-sharing / abuse |
 | **Data Quota** | Lifetime bandwidth cap | `10G`, `500M` | Fair usage |
 | **Expiry Date** | Auto-disable after date | `2026-12-31` | Temporary access |
 
-> **Tip: Use `conns` for device limits, not `ips`.** Each Telegram app opens exactly 1 connection (multiplexed internally), so `conns 3` = max 3 devices. IP limits are less reliable because mobile users roam between cell towers (briefly showing 2 IPs for 1 device), and multiple devices behind the same WiFi share 1 IP. Use `ips` as a secondary anti-sharing measure.
+> **Tip:** Each Telegram app opens **~3 TCP connections** (one per DC). So for device limiting, multiply by 3: `conns 15` ≈ max 5 devices. Setting below 5 will likely break even a single device. IP limits are less reliable because mobile users roam between cell towers (briefly showing 2 IPs for 1 device), and multiple devices behind the same WiFi share 1 IP. Use `ips` as a secondary anti-sharing measure.
 >
 > **Traffic and quotas are lifetime (cumulative)**, not monthly. They don't auto-reset. Use `mtproxymax secret reset-traffic <label>` to manually reset counters, or rotate the secret.
 
@@ -123,11 +124,11 @@ mtproxymax secret setlimits alice 100 5 10G 2026-12-31
 <summary><b>Limit Devices Per User (Recommended)</b></summary>
 
 ```bash
-mtproxymax secret setlimit alice conns 1    # Single device only
-mtproxymax secret setlimit family conns 5   # Family — up to 5 devices
+mtproxymax secret setlimit alice conns 5    # Single device (~3 conns per device, with headroom)
+mtproxymax secret setlimit family conns 15  # Family — up to 5 devices
 ```
 
-If someone with `conns 1` shares their link, the second device can't connect. Each Telegram app = exactly 1 connection.
+Each Telegram app opens ~3 TCP connections. Setting `conns 5` allows one device with headroom. If someone shares their link, the second device will hit the limit.
 
 </details>
 
@@ -167,9 +168,9 @@ mtproxymax secret add bob
 mtproxymax secret add charlie
 
 # Each person gets their own link — revoke individually
-mtproxymax secret setlimit alice conns 2    # 2 devices
-mtproxymax secret setlimit bob conns 1      # 1 device
-mtproxymax secret setlimit charlie conns 3  # 3 devices
+mtproxymax secret setlimit alice conns 10   # ~3 devices
+mtproxymax secret setlimit bob conns 5     # 1 device
+mtproxymax secret setlimit charlie conns 15 # ~5 devices
 ```
 
 </details>
@@ -221,6 +222,47 @@ mtproxymax telegram setup
 - 🔴 Proxy down → instant notification + auto-restart attempt
 - 🟢 Proxy started → sends connection details + QR codes
 - 📊 Periodic traffic reports at your chosen interval
+
+---
+
+### 🗂️ Replication (Master-Slave Config Sync)
+
+Keep multiple proxy servers in sync automatically. The master pushes config changes to all slaves via rsync+SSH on a configurable interval. Slaves receive `secrets.conf`, `upstreams.conf`, `instances.conf`, and `config.toml` — their own role settings and local state are never overwritten.
+
+**Setup takes two commands:**
+
+```bash
+# On master — run wizard, select Master, add slave
+mtproxymax replication setup
+
+# On slave — run wizard, select Slave
+mtproxymax replication setup
+```
+
+**How it works:**
+- Master generates a self-contained sync script at `/opt/mtproxymax/mtproxymax-sync.sh`
+- A systemd timer fires every N seconds (default: 60) and runs the sync
+- On change — proxy container on slave is automatically restarted
+- `settings.conf` and `replication.conf` are always excluded — slave role is never overwritten
+
+```bash
+mtproxymax replication status     # Show role, timer state, last sync
+mtproxymax replication sync       # Trigger immediate sync
+mtproxymax replication logs       # View sync log
+mtproxymax replication test       # Test SSH connectivity to all slaves
+mtproxymax replication promote    # Promote slave to master (failover)
+```
+
+**Roles:**
+
+| Role | Description |
+|------|-------------|
+| **Master** | Pushes config to slaves on schedule |
+| **Slave** | Receives config, read-only. Changes must be made on master |
+| **Standalone** | Replication disabled (default) |
+
+---
+
 
 ---
 
@@ -307,6 +349,7 @@ Engine updates are delivered through `mtproxymax update`. Pre-built multi-arch D
 | **Telegram Bot** | ✅ (17 commands) | ❌ | ❌ | ❌ |
 | **Interactive TUI** | ✅ | ❌ | ❌ | ❌ |
 | **Proxy Chaining** | ✅ (SOCKS5/4, weighted) | ✅ (SOCKS5) | ❌ | ❌ |
+| **Master-Slave Replication** | ✅ (rsync+SSH, systemd) | ❌ | ❌ | ❌ |
 | **Geo-Blocking** | ✅ | IP allowlist/blocklist | ❌ | ❌ |
 | **Ad-Tag Support** | ✅ | ❌ (removed in v2) | ✅ | Varies |
 | **QR Code Generation** | ✅ | ❌ | ❌ | Some |
@@ -369,6 +412,16 @@ Telegram Client
           │
           ▼
    Telegram Servers
+
+
+Master-Slave Replication (optional):
+
+  Master Server              Slave Server(s)
+  ┌──────────────┐           ┌──────────────┐
+  │ mtproxymax   │──rsync──▶ │ mtproxymax   │
+  │ (systemd     │   +SSH    │ (receives    │
+  │  timer 60s)  │           │  config)     │
+  └──────────────┘           └──────────────┘
 ```
 
 | Component | Role |
@@ -376,6 +429,7 @@ Telegram Client
 | **mtproxymax.sh** | Single bash script: CLI, TUI, config manager |
 | **telemt** | Rust MTProto engine running inside Docker |
 | **Telegram bot service** | Independent systemd service polling Bot API |
+| **Replication sync service** | systemd timer pushing config to slave servers |
 | **Prometheus endpoint** | `/metrics` on port 9090 (localhost only) |
 
 ---
@@ -425,6 +479,27 @@ mtproxymax ip [get|auto|<address>]      # Get/set custom IP for proxy links
 mtproxymax domain [get|clear|<host>]    # Get/set FakeTLS domain
 mtproxymax adtag set <hex>              # Set ad-tag
 mtproxymax adtag remove                 # Remove ad-tag
+```
+
+</details>
+
+
+<details>
+<summary><b>Replication</b></summary>
+
+```bash
+mtproxymax replication setup            # Interactive wizard (master/slave/standalone)
+mtproxymax replication status           # Role, timer state, last sync, slave list
+mtproxymax replication add <host> [port] [label]   # Register a slave server
+mtproxymax replication remove <host_or_label>      # Remove a slave
+mtproxymax replication list             # List all slaves
+mtproxymax replication enable           # Enable sync timer
+mtproxymax replication disable          # Disable sync timer
+mtproxymax replication sync             # Trigger immediate sync
+mtproxymax replication test [host]      # Test SSH connectivity to slave(s)
+mtproxymax replication logs             # Show sync log
+mtproxymax replication reset            # Remove all replication config
+mtproxymax replication promote          # Promote slave to master (failover)
 ```
 
 </details>
@@ -510,15 +585,27 @@ mtproxymax telegram remove              # Remove bot completely
 
 ## 📋 Changelog
 
-### v1.0.4 — Engine v3.3.32, SNI Policy & Metrics Dashboard
+### v1.0.4 — Replication, Engine v3.3.38, SNI Policy & Metrics Dashboard
 
-**Engine Upgrade (v3.3.31 → v3.3.32):**
+- **Replication** — sync config from master to slave servers via rsync+SSH with systemd timer
+- **Auto-exclude** — `settings.conf` and `replication.conf` are never synced to slaves, preserving their role and local state
+- **Wizard** — interactive setup for master, slave, and standalone roles
+- **Slave protection** — setting slave role stops any local sync timer and clears stale peer list
+- **Promote** — `mtproxymax replication promote` for manual failover (slave → master)
+- **Role guards** — `replication add/remove/sync` are blocked with a clear error on slave servers
+- **Sync script auto-update** — manual `sync` always regenerates the script from current binary
 
-- **Bounded Hybrid Routing Loop** — Hard timeout on ME no-writer recovery, prevents infinite-spin edge case
-- **ArcSwap Snapshots** — Lock-free concurrent reads on writer pools, endpoints, and family state for less contention
-- **Parallel Health Checks** — Reduced latency during writer recovery
-- **Refined Quarantine** — Draining writers no longer needlessly quarantine healthy endpoints
-- **New Backpressure Model** — Tiered base/high watermark for better overload handling
+**Engine Upgrade (v3.3.31 → v3.3.38):**
+
+- **Apple/XNU Connectivity Fixes** — Resolves connection issues for iOS/macOS Telegram clients
+- **ME Rewrite** — Hybrid routing loop, ArcSwap snapshots, parallel health checks, refined quarantine, tiered backpressure
+- **Conntrack Control** — Automatic conntrack table management under connection pressure with configurable watermarks
+- **New Relay Methods** — Improved middle/direct relay with adaptive buffers
+- **ME2DC Fast Init** — Faster startup, unstoppable initialization (now enabled by default)
+- **Memory Optimizations** — Buffer pool trim, session vec shrink, reduced stats memory footprint
+- **Upstream Timeout Tuning** — `tg_connect` timeout now applied to DC TCP connect attempts, prevents hanging connections
+- **Active IPs API** — New `/v1/stats/users/active-ips` endpoint
+- **Config Fallback** — Engine gracefully falls back if primary config fails to load
 
 **New Features:**
 
